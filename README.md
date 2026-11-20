@@ -129,7 +129,7 @@ python scripts/status.py                # health report: runs, data freshness, m
 
 Once `db/market.db` exists, the notebook loads its data from the database automatically.
 
-### Scheduling (choose one)
+### Scheduling
 
 * **GitHub Actions (runs in the cloud)** — `.github/workflows/daily_pipeline.yml` runs at 23:30 UTC
   on weekdays, after the US close. Runners are wiped after each run, so the database and models are kept in
