@@ -1,4 +1,9 @@
+# Data and model artefacts are produced by the notebook / pipeline, not committed
 data/
+db/
+models/
+logs/
 .ipynb_checkpoints/
 __pycache__/
+.venv/
 .DS_Store

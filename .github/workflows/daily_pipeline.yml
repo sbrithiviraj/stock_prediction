@@ -1,0 +1,52 @@
+name: Daily market data pipeline
+
+on:
+  schedule:
+    # 23:30 UTC on weekdays = 6:30 pm New York in winter (7:30 pm in summer), after the 4 pm close
+    - cron: '30 23 * * 1-5'
+  workflow_dispatch:             # "Run workflow" button for manual runs
+    inputs:
+      force_retrain:
+        description: 'Retrain the model now'
+        type: boolean
+        default: false
+
+concurrency: daily-pipeline      # never run two copies at once
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+      CONTAINER: capstone-pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # GitHub runners are wiped after every run, so the database and models live in Azure Blob Storage
+      - name: Download database and models
+        run: |
+          az storage container create --name "$CONTAINER" --output none
+          mkdir -p db models
+          az storage blob download-batch --source "$CONTAINER" --destination . --pattern 'db/*' --output none
+          az storage blob download-batch --source "$CONTAINER" --destination . --pattern 'models/*' --output none
+
+      - name: Run pipeline
+        run: python -m src.pipeline ${{ inputs.force_retrain && '--force-retrain' || '' }}
+
+      - name: Upload database, models and logs
+        if: always()             # also keep the record of failed runs
+        run: |
+          for folder in db models logs; do
+            if [ -d "$folder" ]; then
+              az storage blob upload-batch --destination "$CONTAINER" --source . --pattern "$folder/*" --overwrite --output none
+            fi
+          done
